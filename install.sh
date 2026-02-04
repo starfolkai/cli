@@ -37,7 +37,15 @@ detect_platform() {
 }
 
 get_latest_version() {
-    VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    # Try API first (may fail due to rate limiting)
+    VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+
+    # If API fails, use GitHub's redirect to get version from URL
+    if [ -z "$VERSION" ]; then
+        REDIRECT_URL=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" 2>/dev/null)
+        VERSION=$(echo "$REDIRECT_URL" | sed -E 's|.*/tag/([^/]+)$|\1|')
+    fi
+
     if [ -z "$VERSION" ]; then
         error "Could not determine latest version. Check https://github.com/${REPO}/releases"
     fi
